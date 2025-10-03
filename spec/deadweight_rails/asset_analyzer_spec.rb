@@ -1,49 +1,52 @@
 require "spec_helper"
+require "fileutils"
 require "deadweight_rails/asset_analyzer"
 
 RSpec.describe DeadweightRails::AssetAnalyzer do
-  let(:tmp_dir) { Dir.mktmpdir }
-  let(:views_dir) { File.join(tmp_dir, "app/views") }
-  let(:css_dir)   { File.join(tmp_dir, "app/assets/stylesheets") }
-  let(:js_dir)    { File.join(tmp_dir, "app/assets/javascripts") }
+  let(:tmp_dir) { File.join(Dir.pwd, "tmp_test") }
 
-  before do
-    FileUtils.mkdir_p([views_dir, css_dir, js_dir])
+  before(:each) do
+    FileUtils.mkdir_p(tmp_dir)
+
+    # Create views
+    views_dir = File.join(tmp_dir, "app/views/home")
+    FileUtils.mkdir_p(views_dir)
+    File.write(File.join(views_dir, "index.html.erb"), "<div class='used'></div>")
+
+    # Create CSS
+    css_dir = File.join(tmp_dir, "app/assets/stylesheets")
+    FileUtils.mkdir_p(css_dir)
+    File.write(File.join(css_dir, "used.css"), ".used {}")
+    File.write(File.join(css_dir, "imported.css"), "@import 'used';")
+    File.write(File.join(css_dir, "unused.css"), ".unused {}")
+
+    # Create JS
+    js_dir = File.join(tmp_dir, "app/assets/javascripts")
+    FileUtils.mkdir_p(js_dir)
+    File.write(File.join(js_dir, "application.js"), "//= require legacy")
+    File.write(File.join(js_dir, "legacy.js"), "console.log('legacy')")
+    File.write(File.join(js_dir, "unused.js"), "console.log('unused')")
   end
 
-  after do
+  after(:each) do
     FileUtils.remove_entry(tmp_dir)
   end
 
   it "detects unused CSS files" do
-    used_css = File.join(css_dir, "used.css")
-    unused_css = File.join(css_dir, "unused.css")
+    result = described_class.new(tmp_dir).scan
+    unused = result[:unused_css].map { |f| File.basename(f) }
 
-    File.write(used_css, ".btn {}")
-    File.write(unused_css, ".old-class {}")
-
-    File.write(File.join(views_dir, "index.html.erb"), "<div class='btn'></div>")
-
-    analyzer = described_class.new(tmp_dir)
-    result = analyzer.scan
-
-    expect(result[:unused_css]).to include(unused_css)
-    expect(result[:unused_css]).not_to include(used_css)
+    expect(unused).to include("unused.css")
+    expect(unused).not_to include("used.css")
+    expect(unused).not_to include("imported.css")
   end
 
   it "detects unused JS files" do
-    used_js = File.join(js_dir, "used.js")
-    unused_js = File.join(js_dir, "legacy.js")
+    result = described_class.new(tmp_dir).scan
+    unused = result[:unused_js].map { |f| File.basename(f) }
 
-    File.write(used_js, "console.log('hello')")
-    File.write(unused_js, "console.log('old')")
-
-    File.write(File.join(views_dir, "show.html.erb"), "<script src='used.js'></script>")
-
-    analyzer = described_class.new(tmp_dir)
-    result = analyzer.scan
-
-    expect(result[:unused_js]).to include(unused_js)
-    expect(result[:unused_js]).not_to include(used_js)
+    expect(unused).to include("unused.js")
+    expect(unused).not_to include("application.js")
+    expect(unused).not_to include("legacy.js")
   end
 end

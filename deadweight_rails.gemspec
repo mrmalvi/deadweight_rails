@@ -13,9 +13,6 @@ Gem::Specification.new do |spec|
   spec.homepage      = "https://github.com/mrmalvi/deadweight_rails"
   spec.license       = "MIT"
 
-  spec.files         = Dir["{lib}/**/*", "bin/*", "README.md"]
-  spec.executables   = ["deadweight_rails"]
-  spec.require_paths = ["lib"]
 
   spec.add_dependency "parser"
   spec.add_dependency "set"
@@ -23,5 +20,15 @@ Gem::Specification.new do |spec|
 
   spec.add_development_dependency "rspec", "~> 3.12"
   spec.add_development_dependency 'rspec-rails', '~> 6.0'
+
+  gemspec = File.basename(__FILE__)
+  spec.files = IO.popen(%w[git ls-files -z], chdir: __dir__, err: IO::NULL) do |ls|
+    ls.readlines("\x0", chomp: true).reject do |f|
+      f == gemspec || f.end_with?('.gem') || f.start_with?(*%w[bin/ Gemfile .gitignore .rspec spec/])
+    end
+  end
+  spec.bindir = "exe"
+  spec.executables = spec.files.grep(%r{\Aexe/}) { |f| File.basename(f) }
+  spec.require_paths = ["lib"]
 end
 
