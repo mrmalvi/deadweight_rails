@@ -1,37 +1,56 @@
+# frozen_string_literal: true
+
 require "colorize"
 
 module DeadweightRails
   class Report
-    def initialize(asset_results, ruby_results, css_class_results = {})
-      @assets           = asset_results
-      @ruby             = ruby_results
-      @css_class_results = css_class_results
+    def initialize(asset_results, ruby_results, css_classes = {})
+      @assets = asset_results || {}
+      @ruby   = ruby_results || {}
+      @css_classes = css_classes || {} # optional: per-file unused CSS classes
     end
 
     def print
-      puts "\n🔎 DeadweightRails Report".upcase.colorize(:cyan)
+      puts "\n🔎 DEADWEIGHTRAILS REPORT".upcase.colorize(:cyan)
 
-      # Assets
+      print_assets
+      print_css_classes
+      print_ruby_methods
+    end
+
+    private
+
+    def print_assets
       puts "\n--- Assets ---".colorize(:green)
-      puts "Unused CSS Files: #{@assets[:unused_css].map { |f| File.basename(f) }.join(", ")}"
-      puts "Unused JS Files:  #{@assets[:unused_js].map { |f| File.basename(f) }.join(", ")}"
 
-      # CSS Classes
-      unless @css_class_results.empty?
-        puts "\n--- Unused CSS Classes ---".colorize(:green)
-        @css_class_results.each do |file, classes|
-          puts "#{file}: #{classes.join(", ")}"
-        end
+      unused_css = (@assets[:unused_css] || []).map { |f| File.basename(f) }
+      unused_js  = (@assets[:unused_js] || []).map { |f| File.basename(f) }
+
+      puts "Unused CSS Files: #{unused_css.join(", ")}"
+      puts "Unused JS Files:  #{unused_js.join(", ")}"
+    end
+
+    def print_css_classes
+      return if @css_classes.empty?
+
+      puts "\n--- Unused CSS Classes ---".colorize(:green)
+      @css_classes.each do |file, classes|
+        next if classes.nil? || classes.empty?
+
+        puts "#{file}: #{classes.join(", ")}"
       end
+    end
 
-      # Ruby
+    def print_ruby_methods
+      unused_methods = @ruby[:unused_methods] || {}
+
+      return if unused_methods.empty?
+
       puts "\n--- Ruby ---".colorize(:green)
-      if @ruby[:unused_methods].empty?
-        puts "No unused methods detected."
-      else
-        @ruby[:unused_methods].each do |klass, methods|
-          puts "#{klass}: #{methods.join(", ")}"
-        end
+      unused_methods.each do |klass, methods|
+        next if methods.nil? || methods.empty?
+
+        puts "#{klass}: #{methods.join(", ")}"
       end
     end
   end
