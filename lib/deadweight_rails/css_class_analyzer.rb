@@ -17,7 +17,7 @@ module DeadweightRails
         content = File.read(file)
         classes = content.scan(/\.(\w[\w-]*)/).flatten
 
-        unused = classes.reject do |cls|
+        unused = (classes || []).reject do |cls|
           views.any? { |view| view.include?(cls) }
         end
 
