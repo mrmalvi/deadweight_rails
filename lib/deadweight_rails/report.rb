@@ -35,7 +35,7 @@ module DeadweightRails
 
       puts "\n--- Unused CSS Classes ---".colorize(:green)
       @css_classes.each do |file, classes|
-        next if classes&.empty?
+        next if classes.nil? || classes.empty?
 
         puts "#{file}: #{classes.join(", ")}"
       end
@@ -48,7 +48,7 @@ module DeadweightRails
 
       puts "\n--- Ruby ---".colorize(:green)
       unused_methods.each do |klass, methods|
-        next if methods.nil? || methods&.empty?
+        next if methods.nil? || methods.empty?
 
         puts "#{klass}: #{methods.join(", ")}"
       end
