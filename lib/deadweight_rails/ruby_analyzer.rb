@@ -1,34 +1,46 @@
-require "parser/current"
+require "find"
 
 module DeadweightRails
   class RubyAnalyzer
     def initialize(path)
       @path = path
-      @defined_methods = []
-      @called_methods  = []
     end
 
     def scan
-      ruby_files = Dir[File.join(@path, "app/**/*.rb")]
+      files = Dir[File.join(@path, "app/**/*.rb")]
+      classes = Hash.new { |h, k| h[k] = [] }
+      usages = Hash.new { |h, k| h[k] = [] }
 
-      ruby_files.each do |file|
-        ast = Parser::CurrentRuby.parse(File.read(file))
-        walk(ast) if ast
+      files.each do |file|
+        content = File.read(file)
+
+        current_class = nil
+        content.each_line do |line|
+          # Detect class definitions
+          if line =~ /^\s*class\s+([\w:]+)/
+            current_class = $1
+          end
+
+          # Detect method definitions
+          if line =~ /^\s*def\s+([\w\?\!]+)/
+            classes[current_class] << $1 if current_class
+          end
+
+          # Detect method calls (very naive: match .method_name)
+          classes.values.flatten.each do |method|
+            usages[current_class] << method if line.include?(method)
+          end
+        end
       end
 
-      unused_methods = @defined_methods - @called_methods
-      { unused_methods: unused_methods }
-    end
+      # Unused = defined - used
+      result = {}
+      classes.each do |klass, methods|
+        unused = methods - usages.values.flatten
+        result[klass] = unused if unused.any?
+      end
 
-    private
-
-    def walk(node)
-      return unless node.is_a?(Parser::AST::Node)
-
-      @defined_methods << node.children.first if node.type == :def
-      @called_methods  << node.children[1] if node.type == :send
-
-      node.children.each { |child| walk(child) if child.is_a?(Parser::AST::Node) }
+      result
     end
   end
 end
