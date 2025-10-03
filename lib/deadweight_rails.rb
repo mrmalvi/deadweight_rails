@@ -3,7 +3,7 @@
 require "deadweight_rails/version"
 require "deadweight_rails/asset_analyzer"
 require "deadweight_rails/ruby_analyzer"
-require "deadweight_rails/css_class_analyzer" # NEW
+require "deadweight_rails/css_class_analyzer"
 require "deadweight_rails/report"
 
 module DeadweightRails
