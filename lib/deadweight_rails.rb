@@ -8,6 +8,7 @@ require "deadweight_rails/report"
 
 module DeadweightRails
   def self.run(path: Dir.pwd)
+    puts "\n🔎 DEADWEIGHTRAILS REPORT".upcase.colorize(:cyan)
     asset_results     = AssetAnalyzer.new(path).scan
     ruby_results      = RubyAnalyzer.new(path).scan
     css_class_results = CSSClassAnalyzer.new(path).scan # NEW

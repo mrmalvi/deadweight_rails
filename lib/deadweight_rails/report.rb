@@ -11,8 +11,6 @@ module DeadweightRails
     end
 
     def print
-      puts "\n🔎 DEADWEIGHTRAILS REPORT".upcase.colorize(:cyan)
-
       print_assets
       print_css_classes
       print_ruby_methods
