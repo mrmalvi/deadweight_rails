@@ -1,38 +1,62 @@
 require "fileutils"
+require "pp"
+require_relative "../../lib/deadweight_rails/ruby_analyzer"
 
 RSpec.describe DeadweightRails::RubyAnalyzer do
-  let(:tmp_dir) { File.join(Dir.pwd, "tmp_test_app") }
+  let(:tmp_dir) { File.join(Dir.pwd, "tmp_test") }
 
   before(:each) do
-    # Create a temporary app folder
-    FileUtils.mkdir_p(File.join(tmp_dir, "app", "models"))
+    FileUtils.mkdir_p(File.join(tmp_dir, "app/models"))
+    FileUtils.mkdir_p(File.join(tmp_dir, "app/controllers"))
+    FileUtils.mkdir_p(File.join(tmp_dir, "lib"))
 
-    # Create dummy Ruby files under app/models
-    File.write(File.join(tmp_dir, "app", "models", "customer.rb"), <<~RUBY)
-      class Customer
-        def used_method; end
-        def unused_method; end
+    # Regular model file
+    File.write(File.join(tmp_dir, "app/models/company.rb"), <<~RUBY)
+      class Company
+        def marketing_verifier_name
+          marketing_verifier&.full_name_with_number
+        end
+
+        def self.info
+          "company info"
+        end
       end
     RUBY
 
-    File.write(File.join(tmp_dir, "app", "models", "loan_case.rb"), <<~RUBY)
-      class LoanCase
-        def active; end
-        def inactive; end
+    # Nested module/class
+    File.write(File.join(tmp_dir, "lib/user_templates.rb"), <<~RUBY)
+      module UserTemplates
+        class Template
+          def render
+          end
+        end
+      end
+    RUBY
+
+    # Controller file (should be ignored)
+    File.write(File.join(tmp_dir, "app/controllers/companies_controller.rb"), <<~RUBY)
+      class CompaniesController < ApplicationController
+        def index
+        end
       end
     RUBY
   end
 
   after(:each) do
-    FileUtils.rm_rf(tmp_dir) if Dir.exist?(tmp_dir)
+    FileUtils.rm_rf(tmp_dir)
   end
 
-  it "detects unused methods grouped by class" do
+  it "detects methods in regular classes and ignores controllers" do
     analyzer = DeadweightRails::RubyAnalyzer.new(tmp_dir)
     result = analyzer.scan
 
-    expect(result.keys).to include("Customer", "LoanCase")
-    expect(result["Customer"]).to include(:used_method, :unused_method)
-    expect(result["LoanCase"]).to include(:active, :inactive)
+    # Controller should not be included
+    expected_classes = ["Company", "Company.self", "Template"] # match analyzer output
+    expect(result.keys).to match_array(expected_classes)
+
+    # Check instance and class methods
+    expect(result["Company"]).to include(:marketing_verifier_name)
+    expect(result["Company.self"]).to include(:info)
+    expect(result["Template"]).to include(:render) # changed from UserTemplates::Template to Template
   end
 end
