@@ -1,53 +1,81 @@
-require "find"
+require "parser/current"
 
 module DeadweightRails
   class RubyAnalyzer
     def initialize(path)
       @path = path
+      @defined_methods = Hash.new { |h, k| h[k] = [] }
+      @called_methods  = Hash.new { |h, k| h[k] = [] }
+      @current_class   = nil
     end
 
     def scan
-      files = Dir[File.join(@path, "app/**/*.rb")]
-      classes = Hash.new { |h, k| h[k] = [] }       # class => [methods]
-      usages  = Hash.new { |h, k| h[k] = [] }       # class => [used methods]
+      ruby_files = Dir[File.join(@path, "app/**/*.rb")]
 
-      files.each do |file|
-        current_class = nil
+      ruby_files.each do |file|
         content = File.read(file)
-
-        content.each_line.with_index do |line, idx|
-          # Detect class definitions
-          if line =~ /^\s*class\s+([\w:]+)/
-            current_class = $1
-          end
-
-          # Detect method definitions
-          if line =~ /^\s*def\s+([\w\?\!]+)/
-            classes[current_class] << { name: $1, line: idx + 1 } if current_class
-          end
-
-          next if current_class.nil?
-
-          # Detect method usage (simplified)
-          classes[current_class].each do |m|
-            method_name = m[:name]
-            # Match `.method` or `method(` or `self.method` but ignore definition line
-            if idx + 1 != m[:line] && line.match?(/(\.|self\.)#{Regexp.escape(method_name)}(\(|\s)/)
-              usages[current_class] << method_name
-            end
-          end
+        begin
+          ast = Parser::CurrentRuby.parse(content)
+          walk(ast) if ast
+        rescue Parser::SyntaxError => e
+          warn "Skipping #{file}: #{e.message}"
         end
       end
 
-      # Unused = defined - used
       result = {}
-      classes.each do |klass, methods|
-        used = usages[klass] || []
+      @defined_methods.each do |klass, methods|
+        used = @called_methods[klass] || []
         unused = methods - used
         result[klass] = unused if unused.any?
       end
 
       result
+    end
+
+    private
+
+    def walk(node)
+      return unless node.is_a?(Parser::AST::Node)
+
+      case node.type
+      when :class, :module
+        prev_class = @current_class
+        @current_class = full_class_name(node)
+        walk_children(node)
+        @current_class = prev_class
+      when :def
+        @defined_methods[@current_class] << node.children.first if @current_class
+        walk_children(node)
+      when :send
+        method_name = node.children[1]
+        @called_methods[@current_class] << method_name if @current_class && method_name
+        walk_children(node)
+      else
+        walk_children(node)
+      end
+    end
+
+    def walk_children(node)
+      node.children.each { |child| walk(child) if child.is_a?(Parser::AST::Node) }
+    end
+
+    def full_class_name(node)
+      if node.type == :class || node.type == :module
+        const_node = node.children.first
+        extract_const_name(const_node)
+      end
+    end
+
+    def extract_const_name(node)
+      return unless node
+      case node.type
+      when :const
+        parent = extract_const_name(node.children[0])
+        name   = node.children[1].to_s
+        parent ? "#{parent}::#{name}" : name
+      else
+        nil
+      end
     end
   end
 end
