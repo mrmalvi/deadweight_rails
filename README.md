@@ -120,4 +120,5 @@ bundle exec rake release
 ## Contributing
 
 Bug reports and pull requests are welcome on GitHub:
+gem "deadweight_rails", path: "../deadweight_rails"
 https://github.com/[USERNAME]/deadwe
